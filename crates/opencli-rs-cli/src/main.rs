@@ -1,7 +1,9 @@
 mod args;
+mod commands;
 mod execution;
 
 use clap::{Arg, ArgAction, Command};
+use clap_complete::Shell;
 use opencli_rs_core::Registry;
 use opencli_rs_discovery::{discover_builtin_adapters, discover_user_adapters};
 use opencli_rs_external::{load_external_clis, ExternalCli};
@@ -12,6 +14,7 @@ use std::str::FromStr;
 use tracing_subscriber::EnvFilter;
 
 use crate::args::coerce_and_validate_args;
+use crate::commands::{completion, doctor};
 use crate::execution::execute_command;
 
 fn build_cli(registry: &Registry, external_clis: &[ExternalCli]) -> Command {
@@ -72,6 +75,40 @@ fn build_cli(registry: &Registry, external_clis: &[ExternalCli]) -> Command {
                 .allow_external_subcommands(true),
         );
     }
+
+    // Built-in utility subcommands
+    app = app
+        .subcommand(Command::new("doctor").about("Run diagnostics checks"))
+        .subcommand(
+            Command::new("completion")
+                .about("Generate shell completions")
+                .arg(
+                    Arg::new("shell")
+                        .required(true)
+                        .value_parser(clap::value_parser!(Shell))
+                        .help("Target shell: bash, zsh, fish, powershell"),
+                ),
+        )
+        .subcommand(
+            Command::new("explore")
+                .about("AI-driven exploration of a website")
+                .arg(Arg::new("url").required(true).help("URL to explore")),
+        )
+        .subcommand(
+            Command::new("synthesize")
+                .about("AI-synthesize a new adapter from a URL")
+                .arg(Arg::new("url").required(true).help("URL to synthesize from")),
+        )
+        .subcommand(
+            Command::new("cascade")
+                .about("Run a cascade of AI commands")
+                .arg(Arg::new("prompt").required(true).help("Natural language prompt")),
+        )
+        .subcommand(
+            Command::new("generate")
+                .about("Generate adapter YAML from a prompt")
+                .arg(Arg::new("prompt").required(true).help("Natural language prompt")),
+        );
 
     app
 }
@@ -142,6 +179,28 @@ async fn main() {
 
     // 5. Route: find matching site+command or external CLI
     if let Some((site_name, site_matches)) = matches.subcommand() {
+        // Handle built-in utility subcommands
+        match site_name {
+            "doctor" => {
+                doctor::run_doctor().await;
+                return;
+            }
+            "completion" => {
+                let shell = site_matches
+                    .get_one::<Shell>("shell")
+                    .copied()
+                    .expect("shell argument required");
+                let mut app = build_cli(&registry, &external_clis);
+                completion::run_completion(&mut app, shell);
+                return;
+            }
+            "explore" | "synthesize" | "cascade" | "generate" => {
+                eprintln!("AI command '{}' is not yet implemented.", site_name);
+                std::process::exit(1);
+            }
+            _ => {}
+        }
+
         // Check if it's an external CLI
         if let Some(ext) = external_clis.iter().find(|e| e.name == site_name) {
             // Gather remaining args for the external CLI
