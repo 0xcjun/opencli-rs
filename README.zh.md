@@ -173,7 +173,7 @@ opencli-rs auth
 opencli-rs generate https://www.moltbook.com/ --goal 'list' --ai
 
 # 搜索商品
-opencli-rs generate https://www.amazon.com/--goal 'search' --ai
+opencli-rs generate https://www.amazon.com/ --goal 'search' --ai
 ```
 
 **工作流程：**
