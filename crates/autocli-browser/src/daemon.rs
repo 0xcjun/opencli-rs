@@ -753,6 +753,22 @@ async fn handle_ai_stream_socket(mut socket: WebSocket) {
     }
 }
 
+/// Compare semver: returns true if `latest` is newer than `current`.
+fn is_newer_version(latest: &str, current: &str) -> bool {
+    let parse = |v: &str| -> Vec<u32> {
+        v.split('.').filter_map(|s| s.parse().ok()).collect()
+    };
+    let l = parse(latest);
+    let c = parse(current);
+    for i in 0..3 {
+        let lv = l.get(i).copied().unwrap_or(0);
+        let cv = c.get(i).copied().unwrap_or(0);
+        if lv > cv { return true; }
+        if lv < cv { return false; }
+    }
+    false
+}
+
 // ─── Update check ───────────────────────────────────────────────
 
 static CACHED_UPDATE: std::sync::OnceLock<tokio::sync::RwLock<Option<serde_json::Value>>> = std::sync::OnceLock::new();
@@ -786,7 +802,7 @@ async fn check_and_cache_update() {
                     "latest_version": latest,
                     "download_url": data.get("download_url").and_then(|v| v.as_str()).unwrap_or(""),
                     "published_at": data.get("published_at").and_then(|v| v.as_str()).unwrap_or(""),
-                    "update_available": latest_clean != current,
+                    "update_available": is_newer_version(latest_clean, current),
                 });
 
                 *update_cache().write().await = Some(cached);
